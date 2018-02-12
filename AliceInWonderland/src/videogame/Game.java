@@ -39,9 +39,11 @@ public class Game implements Runnable {
     private SoundClip collisionClip; //to manage sound when player collides with power
     private SoundClip badCollisionClip; //to manage sound when player collides without power
     private SoundClip powerClip; //when power is acquired
-    private int timeCont; //time counter
-    private int timeCont2;
     private boolean hasSuperPower; //true if player has power each 10 secs
+    private long startTime; //game start time
+    private long elapsedTime; // how much time has passed
+    private long elapsedSeconds;//same as above but in seconds
+    private long pauseTime; //count how much time pause goes on for (seconds)
     /**
      * to create title, width and height and set the game is still not running
      * @param title to set the title of the window
@@ -61,8 +63,7 @@ public class Game implements Runnable {
         badCollisionClip = new SoundClip("/sounds/fail.wav");
         powerClip = new SoundClip("/sounds/power.wav");
         missed = 0;
-        timeCont = 0;
-        timeCont2 = 0;
+        pauseTime = 0;
     }
 
     /**
@@ -138,6 +139,8 @@ public class Game implements Runnable {
         long now;
         // initializing last time to the computer time in nanosecs
         long lastTime = System.nanoTime();
+        //initialize startTime to keep track of secondss
+        startTime = System.currentTimeMillis();
         while (running && !gameOver) {
             // setting the time now to the actual time
             now = System.nanoTime();
@@ -145,18 +148,8 @@ public class Game implements Runnable {
             delta += (now - lastTime) / timeTick;
             // updating the last time
             lastTime = now;
-            //pause the game
             // if delta is positive we tick the game
             if (delta >= 1) {
-                if(timeCont == 600 && timeCont2 == 0){ //10 secs
-                    hasSuperPower = true;
-                    powerClip.play();
-                    timeCont = 0;
-                }
-                if(timeCont2 == 200){ // 3 secs
-                    timeCont2 = 0;
-                    hasSuperPower = false;
-                }
                 tick();
                 render();
                 delta--;
@@ -171,15 +164,24 @@ public class Game implements Runnable {
     }
     
     private void tick() {
-        if (!keyManager.pause) {
+        if (keyManager.pause){
+            //count how much time pause goes on for (seconds)
+            pauseTime = ((System.currentTimeMillis() - elapsedTime) - startTime);
+        }
+        else{
+            //initialize elapsed time
+            elapsedTime = System.currentTimeMillis() - startTime - pauseTime;
+            //time in seconds
+            elapsedSeconds = elapsedTime / 1000;
             if (enemies.size() >= 30 || enemies.size() <= 0) {
                 gameOver = true;
             }
-            if(!hasSuperPower){
-                timeCont++;
+            if (elapsedSeconds % 10 == 0 && elapsedSeconds != 0) { //10 secs
+                hasSuperPower = true;
+                powerClip.play();
             }
-            else{
-                timeCont2++;
+            if (elapsedSeconds % 10 == 3 && hasSuperPower) { // 3 secs
+                hasSuperPower = false;
             }
             // advancing player with colision
             player.tick();
@@ -250,16 +252,20 @@ public class Game implements Runnable {
         {
             g = bs.getDrawGraphics();
             if(!gameOver){
+                g.setFont(new Font("TimesRoman", Font.PLAIN, 30));
+                g.setColor(Color.white);
                 if (keyManager.pause) {
                     g.drawImage(Assets.pauseImg, 0, 0, width, height, null);
+                    /*g.drawString("PauseTime: " + Long.toString(pauseTime / 1000),
+                            getWidth() - 800, 50);*/
                 } else {
                     g.drawImage(Assets.background, 0, 0, width, height, null);
                     player.render(g);
                     //set font
-                    g.setFont(new Font("TimesRoman", Font.PLAIN, 30));
-                    g.setColor(Color.white);
                     g.drawString("Enemies: " + Integer.toString(enemies.size()),
                             getWidth() - 300, 50);
+                    g.drawString("Time: " + Long.toString(elapsedSeconds),
+                            getWidth() - 500, 50);
                     //enemies
                     Iterator itr = enemies.iterator();
                     while (itr.hasNext()) {
